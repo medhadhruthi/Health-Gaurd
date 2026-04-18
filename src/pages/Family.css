@@ -1,0 +1,164 @@
+.family-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.family-header {
+  background: linear-gradient(135deg, #5dade2, var(--secondary));
+  padding: 40px 24px 32px;
+  border-bottom-left-radius: 32px;
+  border-bottom-right-radius: 32px;
+  color: white;
+  text-align: center;
+  box-shadow: var(--shadow-md);
+}
+
+.family-icon-box {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  width: 60px;
+  height: 60px;
+  background: var(--surface);
+  border-radius: 16px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.family-header h1 {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.family-header p {
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.family-content {
+  padding: 24px;
+  flex: 1;
+}
+
+.invite-btn {
+  width: 100%;
+  background-color: var(--primary);
+  color: white;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border-radius: var(--border-radius-md);
+  box-shadow: 0 4px 12px rgba(39, 174, 96, 0.2);
+  margin-bottom: 32px;
+  font-weight: 600;
+  font-size: 16px;
+  transition: opacity 0.2s;
+}
+
+.invite-btn:active {
+  opacity: 0.8;
+}
+
+.section-title {
+  font-size: 18px;
+  color: var(--text-main);
+  margin-bottom: 16px;
+}
+
+.family-card {
+  background-color: var(--surface);
+  border-radius: var(--border-radius-lg);
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.member-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 20px;
+  position: relative;
+}
+
+.member-avatar {
+  font-size: 32px;
+  width: 48px;
+  height: 48px;
+  background-color: var(--background);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 12px;
+  margin-right: 16px;
+}
+
+.member-info h4 {
+  font-size: 16px;
+  margin-bottom: 2px;
+}
+
+.member-info p {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.remove-btn {
+  position: absolute;
+  right: 0;
+  top: 0;
+}
+
+.member-stats {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding-top: 16px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.stat-circle-small {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  border: 4px solid var(--primary);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.stat-circle-small .percent {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.stat-circle-small .label {
+  font-size: 9px;
+  color: var(--text-muted);
+  position: absolute;
+  margin-top: 60px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.stat-item .val {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: 4px;
+}
+
+.stat-item .lab {
+  font-size: 12px;
+  color: var(--text-muted);
+}
