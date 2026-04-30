@@ -219,15 +219,17 @@
 }
 
 .chart-labels {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  display: flex;
+  justify-content: space-between;
   font-size: 10px;
   color: var(--text-muted);
-  gap: 4px;
+  padding: 0 4px;
 }
 
 .chart-labels span {
+  flex: 1;
   text-align: center;
+  min-width: 0;
 }
 
 .pie-chart-card {
@@ -352,6 +354,16 @@
 
 .calendar-day.empty {
   background: transparent;
+}
+
+.calendar-day.disabled {
+  opacity: 0.2;
+  background: rgba(0,0,0,0.02);
+  cursor: not-allowed;
+}
+
+.dark-theme .calendar-day.disabled {
+  background: rgba(255,255,255,0.02);
 }
 
 .calendar-day.complete {

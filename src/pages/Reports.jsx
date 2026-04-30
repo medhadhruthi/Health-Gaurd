@@ -1,6 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import './Reports.css';
 import { useAppContext } from '../context/AppContext';
+import { db } from '../firebase';
+import { collection, query, getDocs, orderBy, where, onSnapshot } from 'firebase/firestore';
 import { Activity, CalendarDays, Sparkles, TrendingUp, CheckCircle2, DownloadCloud, Share2 } from 'lucide-react';
 
 const buildPath = (data, width, height, padding) => {
@@ -30,6 +32,8 @@ export default function Reports() {
   const { user, tasks, isLoading } = useAppContext();
   const [mainTab, setMainTab] = useState('productivity');
   const [viewMode, setViewMode] = useState('weekly');
+  const [logs, setLogs] = useState([]);
+  const [isLogsLoading, setIsLogsLoading] = useState(true);
 
   // Health Data State
   const [healthData, setHealthData] = useState(() => {
@@ -94,52 +98,173 @@ export default function Reports() {
     );
   }
 
+  useEffect(() => {
+    if (!user || user.isDemo) {
+      setLogs([]);
+      setIsLogsLoading(false);
+      return;
+    }
+
+    const thirtyFiveDaysAgo = new Date();
+    thirtyFiveDaysAgo.setDate(thirtyFiveDaysAgo.getDate() - 35);
+
+    const logsQuery = query(
+      collection(db, 'users', user.uid, 'completionLogs'),
+      where('timestamp', '>=', thirtyFiveDaysAgo),
+      orderBy('timestamp', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(logsQuery, (snapshot) => {
+      const logsData = snapshot.docs.map(doc => ({
+        ...doc.data(),
+        id: doc.id,
+        date: doc.data().timestamp?.toDate() || new Date()
+      }));
+      setLogs(logsData);
+      setIsLogsLoading(false);
+    }, (error) => {
+      console.error('Error fetching logs:', error);
+      setIsLogsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
   const sanitizedTasks = Array.isArray(tasks) ? tasks : [];
   const totalTasks = sanitizedTasks.length;
   const completedTasks = sanitizedTasks.filter((task) => task.completed).length;
   const pendingTasks = Math.max(0, totalTasks - completedTasks);
-  const missedTasks = 0; // Start with 0 for new users
+  const missedTasks = 0; 
   const completedPct = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-  const productivityScore = Math.round(60 + completedPct * 0.35);
+  const productivityScore = Math.round(60 + (logs.length > 0 ? Math.min(logs.length * 5, 40) : 0));
   const currentStreak = user?.streak || 0;
   const longestStreak = user?.streak || 0;
 
-  const weeklyData = useMemo(() => {
-    // For new users with no tasks, show empty chart
-    if (totalTasks === 0) return [0, 0, 0, 0, 0, 0, 0];
-    // Otherwise show actual completion data (simplified for demo)
-    return [completedTasks > 0 ? Math.floor(Math.random() * 5) + 1 : 0, 
-            completedTasks > 1 ? Math.floor(Math.random() * 5) + 1 : 0,
-            completedTasks > 2 ? Math.floor(Math.random() * 5) + 1 : 0,
-            completedTasks > 3 ? Math.floor(Math.random() * 5) + 1 : 0,
-            completedTasks > 4 ? Math.floor(Math.random() * 5) + 1 : 0,
-            completedTasks > 5 ? Math.floor(Math.random() * 5) + 1 : 0,
-            completedTasks > 6 ? Math.floor(Math.random() * 5) + 1 : 0];
-  }, [totalTasks, completedTasks]);
+  const { dailyData, weeklyData, monthlyData, dailyLabels, weeklyLabels, monthlyLabels } = useMemo(() => {
+    const now = new Date();
+    
+    // Helper to get local date string YYYY-MM-DD
+    const getLocalDateStr = (d) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
 
-  const monthlyData = useMemo(() => {
-    // For new users, show empty monthly chart
-    if (totalTasks === 0) return Array(30).fill(0);
-    // Otherwise show some variation (simplified)
-    return Array(30).fill(0).map(() => completedTasks > 0 ? Math.floor(Math.random() * 3) + 1 : 0);
-  }, [totalTasks, completedTasks]);
-  const chartData = viewMode === 'weekly' ? weeklyData : monthlyData;
-  const chartLabels = viewMode === 'weekly' ? formatDayNames : [...Array(30)].map((_, index) => String(index + 1));
+    // 1. Daily: Last 24 hours (Hourly blocks, sorted oldest to newest)
+    const daily = Array(24).fill(0);
+    const dLabels = [];
+    for (let i = 23; i >= 0; i--) {
+      const d = new Date(now.getTime() - i * 60 * 60 * 1000);
+      const hour = d.getHours();
+      const ampm = hour >= 12 ? 'pm' : 'am';
+      const displayHour = hour % 12 || 12;
+      dLabels.push(i % 6 === 0 ? `${displayHour}${ampm}` : '');
+    }
+
+    logs.forEach(log => {
+      const diffMs = now.getTime() - log.date.getTime();
+      const diffHours = Math.floor(diffMs / (60 * 60 * 1000));
+      if (diffHours >= 0 && diffHours < 24) {
+        daily[23 - diffHours]++;
+      }
+    });
+
+    // 2. Weekly: Last 7 calendar days (sorted oldest to newest)
+    const weekly = Array(7).fill(0);
+    const wLabels = [];
+    const dayKeys = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = getLocalDateStr(d);
+      dayKeys.push(key);
+      wLabels.push(d.toLocaleDateString('en-US', { weekday: 'short' }));
+    }
+
+    logs.forEach(log => {
+      const logKey = getLocalDateStr(log.date);
+      const index = dayKeys.indexOf(logKey);
+      if (index !== -1) {
+        weekly[index]++;
+      }
+    });
+
+    // 3. Monthly: Last 30 calendar days (sorted oldest to newest)
+    const monthly = Array(30).fill(0);
+    const mLabels = [];
+    const monthKeys = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = getLocalDateStr(d);
+      monthKeys.push(key);
+      mLabels.push(String(d.getDate()));
+    }
+
+    logs.forEach(log => {
+      const logKey = getLocalDateStr(log.date);
+      const index = monthKeys.indexOf(logKey);
+      if (index !== -1) {
+        monthly[index]++;
+      }
+    });
+
+    return { 
+      dailyData: daily, weeklyData: weekly, monthlyData: monthly, 
+      dailyLabels: dLabels, weeklyLabels: wLabels, monthlyLabels: mLabels 
+    };
+  }, [logs]);
+
+  const chartData = viewMode === 'daily' ? dailyData : (viewMode === 'weekly' ? weeklyData : monthlyData);
+  const chartLabels = useMemo(() => {
+    if (viewMode === 'daily') return dailyLabels;
+    if (viewMode === 'weekly') return weeklyLabels;
+    return monthlyLabels;
+  }, [viewMode, dailyLabels, weeklyLabels, monthlyLabels]);
 
   const linePath = buildPath(chartData, 320, 180, 24);
   const fillPath = `${linePath} L 296 156 L 24 156 Z`;
 
   const completedSet = useMemo(() => {
-    // For new users with no completed tasks, show empty calendar
-    if (completedTasks === 0) return new Set();
-    // For users with completed tasks, show some sample completed days
-    const sampleDays = [];
-    for (let i = 0; i < Math.min(completedTasks, 15); i++) {
-      sampleDays.push(Math.floor(Math.random() * 28) + 1);
+    const set = new Set();
+    const currentMonth = new Date().getMonth();
+    const currentYear = new Date().getFullYear();
+    
+    logs.forEach(log => {
+      if (log.date.getMonth() === currentMonth && log.date.getFullYear() === currentYear) {
+        set.add(log.date.getDate());
+      }
+    });
+    return set;
+  }, [logs]);
+
+  const calendarDays = useMemo(() => {
+    const year = new Date().getFullYear();
+    const month = new Date().getMonth();
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const offset = firstDay === 0 ? 6 : firstDay - 1; // Monday-first
+
+    const accountCreatedDate = user?.createdAt ? new Date(user.createdAt) : new Date(0);
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+
+    const days = Array.from({ length: offset }, () => ({ label: '', complete: false, empty: true }));
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const date = new Date(year, month, day);
+      const isBeforeCreation = date < new Date(accountCreatedDate.getFullYear(), accountCreatedDate.getMonth(), accountCreatedDate.getDate());
+      const isFuture = date > today;
+      
+      days.push({ 
+        label: String(day), 
+        complete: completedSet.has(day), 
+        empty: false,
+        disabled: isBeforeCreation || isFuture
+      });
     }
-    return new Set(sampleDays);
-  }, [completedTasks]);
-  const calendarDays = useMemo(() => getCalendarDays(new Date().getFullYear(), new Date().getMonth(), completedSet), [completedSet]);
+    return days;
+  }, [completedSet, user?.createdAt]);
 
   const exportReport = () => {
     const report = {
@@ -318,9 +443,10 @@ export default function Reports() {
             <div className="chart-header">
             <div>
               <p className="small-label">Task completion</p>
-              <h2>{viewMode === 'weekly' ? 'Last 7 days' : 'Last 30 days'}</h2>
+              <h2>{viewMode === 'daily' ? 'Today' : (viewMode === 'weekly' ? 'Last 7 days' : 'Last 30 days')}</h2>
             </div>
             <div className="chart-toggle">
+              <button className={viewMode === 'daily' ? 'active' : ''} onClick={() => setViewMode('daily')}>Daily</button>
               <button className={viewMode === 'weekly' ? 'active' : ''} onClick={() => setViewMode('weekly')}>Weekly</button>
               <button className={viewMode === 'monthly' ? 'active' : ''} onClick={() => setViewMode('monthly')}>Monthly</button>
             </div>
@@ -422,9 +548,9 @@ export default function Reports() {
             <div key={label} className="calendar-weekday">{label}</div>
           ))}
           {calendarDays.map((day, index) => (
-            <div key={`${day.label}-${index}`} className={`calendar-day ${day.complete ? 'complete' : ''} ${day.empty ? 'empty' : ''}`}>
+            <div key={`${day.label}-${index}`} className={`calendar-day ${day.complete ? 'complete' : ''} ${day.empty ? 'empty' : ''} ${day.disabled ? 'disabled' : ''}`}>
               {day.label && <span>{day.label}</span>}
-              {!day.empty && <span className="day-dot" />}
+              {!day.empty && !day.disabled && <span className="day-dot" />}
             </div>
           ))}
         </div>

@@ -1,7 +1,7 @@
 import React, { createContext, useState, useEffect, useContext, useRef } from 'react';
 import { db, auth } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, query, onSnapshot, doc, getDoc, setDoc, deleteDoc, updateDoc, addDoc } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc, getDoc, setDoc, deleteDoc, updateDoc, addDoc, serverTimestamp, where, getDocs, orderBy } from 'firebase/firestore';
 import { scheduleReminder, cancelReminder, rescheduleAllReminders } from '../utils/reminderUtils';
 
 const AppContext = createContext();
@@ -202,8 +202,13 @@ export const AppProvider = ({ children }) => {
               level: userData.level || 'Starter',
               points: userData.points || 0,
               streak: userData.streak || 0,
-              lastCompletedDate: userData.lastCompletedDate || null
+              lastCompletedDate: userData.lastCompletedDate || null,
+              createdAt: userData.createdAt || firebaseUser.metadata.creationTime
             });
+
+            if (!userData.createdAt) {
+              updateDoc(userDocRef, { createdAt: firebaseUser.metadata.creationTime });
+            }
           } else {
             // First time user, create profile with defaults
             const newUserProfile = {
@@ -212,7 +217,8 @@ export const AppProvider = ({ children }) => {
               level: 'Starter',
               points: 0,
               streak: 0,
-              lastCompletedDate: null
+              lastCompletedDate: null,
+              createdAt: new Date().toISOString()
             };
             await setDoc(userDocRef, newUserProfile);
             setUser({
@@ -317,6 +323,30 @@ export const AppProvider = ({ children }) => {
       await updateDoc(doc(db, 'users', user.uid, 'tasks', id), {
         completed
       });
+
+      if (completed) {
+        // Log completion
+        await addDoc(collection(db, 'users', user.uid, 'completionLogs'), {
+          taskId: id,
+          taskTitle: task.title,
+          category: task.category,
+          timestamp: serverTimestamp()
+        });
+      } else {
+        // Remove last log for this task today (if any)
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
+        const logsQuery = query(
+          collection(db, 'users', user.uid, 'completionLogs'),
+          where('taskId', '==', id),
+          where('timestamp', '>=', startOfDay),
+          orderBy('timestamp', 'desc')
+        );
+        const logSnap = await getDocs(logsQuery);
+        if (!logSnap.empty) {
+          await deleteDoc(doc(db, 'users', user.uid, 'completionLogs', logSnap.docs[0].id));
+        }
+      }
     }
   };
 
@@ -421,6 +451,7 @@ export const AppProvider = ({ children }) => {
         points: 0,
         streak: 0,
         lastCompletedDate: null,
+        createdAt: new Date().toISOString(),
         isDemo: true
       };
 
