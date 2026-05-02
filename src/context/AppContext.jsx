@@ -489,6 +489,18 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const logoutUser = async () => {
+    try {
+      await auth.signOut();
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+    localStorage.removeItem('demoUser');
+    setUser(null);
+    setTasks([]);
+    setFamily([]);
+  };
+
   return (
     <AppContext.Provider value={{ 
       user, 
@@ -499,6 +511,7 @@ export const AppProvider = ({ children }) => {
       deleteTask,
       addFamilyMember,
       loginUser,
+      logoutUser,
       updateUserName,
       darkMode, setDarkMode,
       notificationsEnabled, togglePushNotif,

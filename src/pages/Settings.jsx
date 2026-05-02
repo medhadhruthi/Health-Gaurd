@@ -4,7 +4,7 @@ import { useAppContext } from '../context/AppContext';
 import { Bell, Volume2, Moon, User, Key, ChevronRight, Flame } from 'lucide-react';
 
 export default function Settings() {
-  const { user, updateUserName, darkMode, setDarkMode, notificationsEnabled, togglePushNotif } = useAppContext();
+  const { user, updateUserName, darkMode, setDarkMode, notificationsEnabled, togglePushNotif, logoutUser } = useAppContext();
   
   const [sound, setSound] = useState(true);
   const [isEditingName, setIsEditingName] = useState(false);
@@ -120,11 +120,7 @@ export default function Settings() {
       <button 
         className="invite-btn" 
         style={{marginTop: 32, backgroundColor: '#e74c3c'}}
-        onClick={() => {
-          import('../firebase').then(({ auth }) => {
-            auth.signOut();
-          });
-        }}
+        onClick={logoutUser}
       >
         <span>Sign Out</span>
       </button>
